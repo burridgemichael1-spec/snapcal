@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SnapCalories</title>
+  <meta name="theme-color" content="#111827"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- ZXing for barcode scanning -->
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <link rel="stylesheet" href="/styles/style.css">
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+  <header class="sticky top-0 z-10 bg-gray-900/80 backdrop-blur border-b border-gray-800">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl font-semibold tracking-tight">SnapCalories</h1>
+      <button id="openSettings" class="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm">Settings</button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl mx-auto w-full px-4 py-4 space-y-6">
+    <!-- Camera / Scanner Area -->
+    <section class="rounded-2xl border border-gray-800 overflow-hidden">
+      <div class="p-4 grid gap-3 md:grid-cols-[1fr_auto] items-center">
+        <div class="space-y-3">
+          <div class="text-sm text-gray-300">Quick actions</div>
+          <div class="flex flex-wrap gap-2">
+            <button id="btnSnap" class="btn-primary">📸 Snap Photo</button>
+            <button id="btnScan" class="btn-secondary">🧾 Scan Barcode</button>
+            <button id="btnManual" class="btn-secondary">➕ Manual Add</button>
+          </div>
+          <p class="text-xs text-gray-400">Tip: On iOS, add to Home Screen for the best camera experience.</p>
+        </div>
+        <div class="justify-self-end">
+          <div class="text-right text-xs text-gray-400">Date</div>
+          <input id="datePicker" type="date" class="input" />
+        </div>
+      </div>
+
+      <div id="viewer" class="relative bg-black aspect-video hidden">
+        <video id="video" playsinline class="w-full h-full object-cover"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        <div class="absolute inset-x-0 bottom-0 p-3 flex items-center justify-center gap-2">
+          <button id="btnCapture" class="btn-primary hidden">Capture</button>
+          <button id="btnStop" class="btn-secondary hidden">Stop</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Progress -->
+    <section class="rounded-2xl border border-gray-800 p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Today's Progress</h2>
+        <div class="text-sm text-gray-300">
+          Goal: <span id="goalLabel">2000</span> kcal
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 items-center">
+        <div class="flex items-center justify-center">
+          <canvas id="pie"></canvas>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-gray-300">Consumed</span>
+            <span id="consumedLabel" class="font-semibold">0 kcal</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-300">Remaining</span>
+            <span id="remainingLabel" class="font-semibold">0 kcal</span>
+          </div>
+          <div class="mt-4">
+            <button id="resetToday" class="px-3 py-2 rounded-xl border border-gray-800 hover:bg-gray-800 text-sm">Reset today</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Today's log -->
+    <section class="rounded-2xl border border-gray-800">
+      <div class="p-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Today's log</h2>
+        <div class="text-xs text-gray-400">Tap an item to edit</div>
+      </div>
+      <ul id="logList" class="divide-y divide-gray-800"></ul>
+    </section>
+  </main>
+
+  <!-- Review Modal -->
+  <div id="reviewModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Review & Confirm</h3>
+        <button id="closeReview" class="icon-btn" title="Close">✖</button>
+      </div>
+      <div id="reviewItems" class="space-y-2 mb-4"></div>
+      <div class="flex items-center justify-between font-semibold py-2 border-t border-gray-800">
+        <div>Total</div>
+        <div id="reviewTotal">0 kcal</div>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button id="confirmConsume" class="btn-primary flex-1">Consume</button>
+        <button id="confirmLeave" class="btn-secondary flex-1">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Settings</h3>
+        <button id="closeSettings" class="icon-btn" title="Close">✖</button>
+      </div>
+      <div class="grid gap-3">
+        <label class="grid gap-1">
+          <span class="text-sm text-gray-300">Daily calorie goal (kcal)</span>
+          <input id="dailyGoal" type="number" min="200" step="50" class="input" />
+        </label>
+
+        <div class="rounded-xl border border-gray-800 p-3 bg-gray-900/50">
+          <div class="text-sm font-semibold mb-1">AI photo analysis</div>
+          <p class="text-xs text-gray-400 mb-2">
+            Optional: set an <span class="font-mono">OPENAI_API_KEY</span> on Netlify to enable automatic food detection from photos.
+          </p>
+          <div class="text-xs text-gray-400">Barcode scan uses Open Food Facts and works without keys.</div>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button id="saveSettings" class="btn-primary w-full">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Add Modal -->
+  <div id="manualModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Add Food Manually</h3>
+        <button id="closeManual" class="icon-btn" title="Close">✖</button>
+      </div>
+      <div class="grid gap-3">
+        <label class="grid gap-1">
+          <span class="text-sm text-gray-300">Food name</span>
+          <input id="manualName" class="input" />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm text-gray-300">Calories (kcal)</span>
+          <input id="manualCalories" type="number" min="0" class="input" />
+        </label>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button id="manualAdd" class="btn-primary flex-1">Add</button>
+        <button id="manualCancel" class="btn-secondary flex-1">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="py-6 text-center text-xs text-gray-500">
+    <p>Built for you — works offline, installable on mobile.</p>
+  </footer>
+
+  <script src="/scripts/main.js" type="module"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+      });
+    }
+  </script>
+</body>
+</html>

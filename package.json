@@ -1,0 +1,13 @@
+{
+  "name": "snapcal",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Static app'"
+  },
+  "dependencies": {
+    "openai": "^4.58.0"
+  }
+}
